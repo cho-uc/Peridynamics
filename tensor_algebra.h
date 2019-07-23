@@ -15,6 +15,17 @@ void printArray(vector<T> &myArray) {
 }
 
 template<typename T>
+void printMatrix(vector<vector<T>> &myArray) {
+	for(size_t x = 0;x < myArray.size(); ++x){
+        for(size_t y = 0;y < myArray[x].size();++y){
+            cout<<myArray[x][y];
+			printf("  ");
+        }
+        cout << endl;
+    }		
+}
+
+template<typename T>
 float dot_product(vector<T> &a,vector<T> &b) {
 	T result=0.0;
 	for(size_t i = 0;i < a.size(); ++i){

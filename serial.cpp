@@ -81,14 +81,14 @@ int main(int argc, char **argv){
 
 	for (size_t i = 0; i < node; ++i) {
 			m[i]=0;
-			for (size_t k = 0; k < neighbor_list.size(); ++k){ // need update
-				size_t j=neighbor_list[k];
-				vector<float> xi(node,0.0);
-				for (size_t idx = 0; idx < xi.size(); ++idx){	//xi= vector
-					xi[idx]=(x[j]-x[i]);
-				}
-				float omega=exp(-abs(dot_product(xi,xi))/(small_delta*small_delta));
-				m[i]=m[i]+omega*(dot_product(xi,xi))*delta_V[j];
+			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
+				size_t j=neighbor_list[i][k];
+				float xi_x=x[j]-x[i];
+				float xi_y=y[j]-y[i];
+				float xi_z=z[j]-z[i];
+				float xi_square=pow(xi_x,2)+pow(xi_y,2)+pow(xi_z,2);
+				float omega=exp(-xi_square/(small_delta*small_delta));
+				m[i]=m[i]+omega*xi_square*delta_V[j];
 			}
 			
 	}
@@ -119,6 +119,9 @@ int main(int argc, char **argv){
 		
 		}
 	}
+	
+	cout<<"Total norm = "<<norm(u_x_n1)+norm(u_y_n1)+norm(u_z_n1)+norm(u_dot_x_n1)+norm(u_dot_y_n1)+norm(u_dot_z_n1)\
+			+norm(u_doubledot_x_n1)+norm(u_doubledot_y_n1)+norm(u_doubledot_z_n1)<<endl;
 	printf("End of program!");
 	
 	//TODO : Meshing
