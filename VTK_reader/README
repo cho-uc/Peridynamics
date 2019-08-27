@@ -1,0 +1,6 @@
+VTK Reader
+v01 : straight from source ReadLegacyUnstructuredGrid from VTK website with few changes
+v02 : Remove node numbering
+v03 : Add 2D text : unsuccessful yet
+ColoredPoints : Read from text file (not from VTK legacy format) 
+coloring according to displacement
