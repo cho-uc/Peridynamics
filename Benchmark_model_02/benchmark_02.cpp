@@ -6,6 +6,7 @@
 #include <fstream> // for writing to file
 #include <math.h>       //exp, pi
 #include "tensor_algebra.h"
+#include <iomanip> // cout precision
 
 using namespace std;
 
@@ -14,9 +15,9 @@ int main(int argc, char **argv){
 	
 	const float E = 200.0e9; // Young's modulus
 	const float nu=0.25; //Poisson's ratio
-	const float mu=E/(2*(1+nu)); //shear modulus
-	const float k=E/(3*(1-2*nu)); // bulk modulus
-	const float ro=7850; // mass densiy
+	const float mu=E/(2.0*(1.0+nu)); //shear modulus
+	const float k_bulk_mod=E/(3.0*(1.0-2.0*nu)); // bulk modulus
+	const float ro=7850.0; // mass densiy
 	const float load = 200.0; //Newton
 	
 	const float length = 1.0; //X
@@ -24,25 +25,21 @@ int main(int argc, char **argv){
 	const float heigth = 1.0e-3; //Z
 	
 	const size_t ndivx = 1000;
-	//const size_t ndivx = 5;
+	//const size_t ndivx = 200;
 	const size_t ndivy = 1;
 	const size_t ndivz = 1;
 	const size_t node = ndivx*ndivy*ndivz;
 	const float delta=length/ndivx;
 	const float small_delta=3.015*delta; //horizon
 	
-	const float delta_t_critical=(length/ndivx)/sqrt(k/ro);
-	const float delta_t=0.04*delta_t_critical;
-	const float T=(1000.0*delta_t);
-	//const float T=(80.0*delta_t);
-	const float num_steps= T/delta_t;
-	
-	
 	
 	vector<float> m(node,0.0); // weight
 	vector<float> x(node,0.0);
 	vector<float> y(node,0.0);
 	vector<float> z(node,0.0);
+	vector<float> x_plus_ux(node,0.0);
+	vector<float> y_plus_uy(node,0.0);
+	vector<float> z_plus_uz(node,0.0);
 	
 	vector<float> f_x(node,0.0); //TODO : f_x should be separated between n & (n+1)?
 	vector<float> f_y(node,0.0);
@@ -63,6 +60,7 @@ int main(int argc, char **argv){
 	vector<float> u_x_n0(node,0.0);	vector<float> u_x_n1(node,0.0);
 	vector<float> u_y_n0(node,0.0);	vector<float> u_y_n1(node,0.0); 	
 	vector<float> u_z_n0(node,0.0);	vector<float> u_z_n1(node,0.0); 
+	vector<float> u_n1(node,0.0); //scalar of total disp
 	vector<float> u_dot_x_n0(node,0.0); vector<float> u_dot_x_nhalf(node,0.0); vector<float> u_dot_x_n1(node,0.0); 	
 	vector<float> u_dot_y_n0(node,0.0); vector<float> u_dot_y_nhalf(node,0.0);vector<float> u_dot_y_n1(node,0.0); 
 	vector<float> u_dot_z_n0(node,0.0);vector<float> u_dot_z_nhalf(node,0.0);vector<float> u_dot_z_n1(node,0.0);
@@ -70,7 +68,8 @@ int main(int argc, char **argv){
 	vector<float> u_doubledot_y_n0(node,0.0); vector<float> u_doubledot_y_n1(node,0.0); 
 	vector<float> u_doubledot_z_n0(node,0.0);vector<float> u_doubledot_z_n1(node,0.0);
 	
-	cout << "delta_t_critical = "<<delta_t_critical<<endl;
+	
+	
 	for (size_t i = 0; i < ndivx; ++i) {
 		for (size_t j = 0; j < ndivy; ++j) {
 			for (size_t k = 0; k < ndivz; ++k) {
@@ -92,7 +91,7 @@ int main(int argc, char **argv){
 		neighbor_list.push_back(vector<size_t>());
 		for(size_t j = 0; j < node; ++j){
 			if (i!=j){
-				float distance =sqrt(pow((x[i]-x[j]),2)+pow((y[i]-y[j]),2)+pow((z[i]-z[j]),2));
+				float distance =sqrt(pow((x[i]-x[j]),2.0)+pow((y[i]-y[j]),2.0)+pow((z[i]-z[j]),2.0));
 				if (distance<small_delta){
 					neighbor_list[i].push_back(j);
 				}
@@ -111,7 +110,40 @@ int main(int argc, char **argv){
 	}
 	file_15.close();
 	
-	b_x[ndivx-1] = load/delta_V[0]; //load at the end node
+	
+	//Critical time step
+	float V_dot_C=0.0;
+	float V_dot_C_temp=0.0;
+	for (size_t i = 0; i < node; ++i) {	
+			V_dot_C_temp=0.0; //Re-initialization
+			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
+				size_t j=neighbor_list[i][k];
+				float xi_x=x[j]-x[i];
+				float xi_y=y[j]-y[i];
+				float xi_z=z[j]-z[i];
+				float xi_square=pow(xi_x,2.0)+pow(xi_y,2.0)+pow(xi_z,2.0);
+				float C_p=18.0*k_bulk_mod/(sqrt(xi_square)*M_PI*pow(small_delta,4));
+				V_dot_C_temp += (C_p*delta_V[j]);
+			}
+			if(V_dot_C_temp>V_dot_C){ //find max
+				V_dot_C=V_dot_C_temp;
+			}
+	}
+	//const float delta_t_critical=(length/ndivx)/sqrt(k/ro); //CLF method
+	const float delta_t_critical=sqrt(2.0*ro/(V_dot_C));
+	cout << "delta_t_critical = "<<delta_t_critical<<endl;
+	const float delta_t=delta_t_critical*0.1; // safety factor = 1.0
+	cout << "delta_t = "<<delta_t<<endl;
+	
+	const float T=(1100.0*delta_t);
+	//const float T=(500.0*delta_t);
+	cout<<"Total T="<<(T*1000.0)<<" ms"<<endl;
+	const float num_steps= T/delta_t;
+	
+	
+	for (size_t i = (node-4); i < node; ++i) {
+		b_x[i] = load/(node*delta_V[i]); //load to end points
+	}
 	
 	//###########################################################################
 	//Algo I (Linear Peridynamic Solid Initialization)
@@ -123,11 +155,10 @@ int main(int argc, char **argv){
 				float xi_x=x[j]-x[i];
 				float xi_y=y[j]-y[i];
 				float xi_z=z[j]-z[i];
-				float xi_square=pow(xi_x,2)+pow(xi_y,2)+pow(xi_z,2);
+				float xi_square=pow(xi_x,2.0)+pow(xi_y,2.0)+pow(xi_z,2.0);
 				float omega=exp(-xi_square/(small_delta*small_delta));
 				m[i]+=omega*xi_square*delta_V[j];
 			}
-			
 	}
 
 	ofstream file_16;
@@ -143,15 +174,31 @@ int main(int argc, char **argv){
 	ofstream file_17;
 	file_17.open ("disp_cpp.txt");
 	for (size_t t_step = 0; t_step < num_steps; ++t_step){
-		if(t_step%100==0){
-			cout<<"==========================" << endl;
+		
+		if(t_step%50==0){
 			cout<<"Time step t=" <<t_step<< endl;
 		}
+		
+		//First partial velocity update & nodal displacement
 		for (size_t i = 0; i < node; ++i) {
-			f_x[i]=0.0; //TODO : Re-initialization here ???
-			f_y[i]=0.0;
-			f_z[i]=0.0;
+			u_dot_x_nhalf[i]=u_dot_x_n0[i]+(delta_t/2.0*u_doubledot_x_n0[i]);
+			u_dot_y_nhalf[i]=u_dot_y_n0[i]+(delta_t/2.0*u_doubledot_y_n0[i]);
+			u_dot_z_nhalf[i]=u_dot_z_n0[i]+(delta_t/2.0*u_doubledot_z_n0[i]);
+			
+			u_x_n1[i]=u_x_n0[i]+(delta_t*u_dot_x_nhalf[i]);
+			u_y_n1[i]=u_y_n0[i]+(delta_t*u_dot_y_nhalf[i]);
+			u_z_n1[i]=u_z_n0[i]+(delta_t*u_dot_z_nhalf[i]);
 		}
+		
+		//Apply BC
+		for (size_t j = 0; j <4; ++j) { // in the beginning of the string
+			u_x_n0[j]=0.0; 	u_y_n0[j]=0.0;	u_z_n0[j]=0.0;
+			u_dot_x_n0[j]=0.0; 	u_dot_y_n0[j]=0.0;	u_dot_z_n0[j]=0.0;
+			u_doubledot_x_n0[j]=0.0; u_doubledot_y_n0[j]=0.0; u_doubledot_z_n0[j]=0.0;
+			u_dot_x_nhalf[j]=0.0; 	u_dot_y_nhalf[j]=0.0;	u_dot_z_nhalf[j]=0.0;
+			u_x_n1[j]=0.0;          u_y_n1[j]=0.0;          u_z_n1[j]=0.0;
+		}
+		
 		//Compute the dilatation
 		for (size_t i = 0; i < node; ++i) {
 			theta[i]=0.0;
@@ -164,16 +211,21 @@ int main(int argc, char **argv){
 				float eta_x=u_x_n1[j]-u_x_n1[i];
 				float eta_y=u_y_n1[j]-u_y_n1[i];
 				float eta_z=u_z_n1[j]-u_z_n1[i];
-				float xi_square=pow(xi_x,2)+pow(xi_y,2)+pow(xi_z,2);
+				float xi_square=pow(xi_x,2.0)+pow(xi_y,2.0)+pow(xi_z,2.0); 
 				float omega=exp(-xi_square/(small_delta*small_delta));
-				float xi_plus_eta=sqrt(pow((xi_x+eta_x),2)+pow((xi_y+eta_y),2)+pow((xi_z+eta_z),2));
+				float xi_plus_eta=sqrt(pow((xi_x+eta_x),2.0)+pow((xi_y+eta_y),2.0)+pow((xi_z+eta_z),2.0));
 				float e=xi_plus_eta-sqrt(xi_square);	//extension state			
 				theta[i]=theta[i]+(3.0/m[i]*omega*(sqrt(xi_square))*e*delta_V[j]);
 				
 			}
 		}
-		//Compute the pairwise contributions to the global force density vector
+		//Re-initialization peridynamics force
 		for (size_t i = 0; i < node; ++i) {
+			f_x[i]=0.0; 	f_y[i]=0.0; 	f_z[i]=0.0;
+		}
+		
+		//Compute the pairwise contributions to the global force density vector
+		for (size_t i = 0; i < node; ++i) {			
 			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
 				size_t j=neighbor_list[i][k];
 				
@@ -185,14 +237,13 @@ int main(int argc, char **argv){
 				float eta_y=u_y_n1[j]-u_y_n1[i];
 				float eta_z=u_z_n1[j]-u_z_n1[i];
 				
-				float xi_square=pow(xi_x,2)+pow(xi_y,2)+pow(xi_z,2);
-				float omega=exp(-xi_square/(small_delta*small_delta));
-				float xi_plus_eta=sqrt(pow((xi_x+eta_x),2)+pow((xi_y+eta_y),2)+pow((xi_z+eta_z),2));
+				float xi_square=pow(xi_x,2.0)+pow(xi_y,2.0)+pow(xi_z,2.0);
+				float omega=exp(-xi_square/(small_delta*small_delta)); // 0.6-0.8
+				float xi_plus_eta=sqrt(pow((xi_x+eta_x),2.0)+pow((xi_y+eta_y),2.0)+pow((xi_z+eta_z),2.0));
 				float e=xi_plus_eta-sqrt(xi_square);	//extension state			
 				
-				
 				float e_d=e-(theta[i]*sqrt(xi_square)/3.0);	//deviatoric extension state
-				float t=(3.0/m[i]*k*theta[i]*omega*sqrt(xi_square))+(15.0*mu/m[i]*omega*e_d);
+				float t=(3.0/m[i]*k_bulk_mod*theta[i]*omega*sqrt(xi_square))+(15.0*mu/m[i]*omega*e_d); //scalar force state
 				float M_x=(xi_x+eta_x)/xi_plus_eta;
 				float M_y=(xi_y+eta_y)/xi_plus_eta;
 				float M_z=(xi_z+eta_z)/xi_plus_eta;
@@ -204,6 +255,7 @@ int main(int argc, char **argv){
 				f_x[j] -= (t*M_x*delta_V[i]);
 				f_y[j] -= (t*M_y*delta_V[i]);
 				f_z[j] -= (t*M_z*delta_V[i]);
+				
 			}
 			
 		}
@@ -211,25 +263,9 @@ int main(int argc, char **argv){
 		//Calculate displacement
 		for (size_t i = 0; i < node; ++i) {
 			
-			u_dot_x_nhalf[i]=u_dot_x_n0[i]+(delta_t/2.0*u_doubledot_x_n0[i]);
-			u_dot_y_nhalf[i]=u_dot_y_n0[i]+(delta_t/2.0*u_doubledot_y_n0[i]);
-			u_dot_z_nhalf[i]=u_dot_z_n0[i]+(delta_t/2.0*u_doubledot_z_n0[i]);
-			
-			
-			u_x_n1[i]=u_x_n0[i]+(delta_t*u_dot_x_nhalf[i]);
-			u_y_n1[i]=u_y_n0[i]+(delta_t*u_dot_y_nhalf[i]);
-			u_z_n1[i]=u_z_n0[i]+(delta_t*u_dot_z_nhalf[i]);
-			
-			//Apply BC
-			/*
-			u_x_n0[0]=0.0; // in the beginning of the cable
-			u_dot_x_n0[0]=0.0;
-			u_doubledot_x_n0[0]=0.0;
-			*/
 			u_doubledot_x_n1[i]=(f_x[i]+b_x[i])/ro;
 			u_doubledot_y_n1[i]=(f_y[i]+b_y[i])/ro;
 			u_doubledot_z_n1[i]=(f_z[i]+b_z[i])/ro;
-			//cout<<"u_doubledot_x_n1 = "<<u_doubledot_x_n1 [i]<<", for i="<<i<<endl;
 			
 			u_dot_x_n1[i]=u_dot_x_nhalf[i]+(delta_t/2.0*u_doubledot_x_n1[i]);
 			u_dot_y_n1[i]=u_dot_y_nhalf[i]+(delta_t/2.0*u_doubledot_y_n1[i]);
@@ -247,13 +283,41 @@ int main(int argc, char **argv){
 			u_doubledot_y_n0[i]=u_doubledot_y_n1[i];
 			u_doubledot_z_n0[i]=u_doubledot_z_n1[i];
 			
-			//cout<<"u_x_n1 = "<<u_x_n1 [i]<<", for i="<<i<<endl;
 		}
 		
-		file_17 <<t_step<<"   "<<u_x_n1[floor(node/2)]<<"   "<<u_x_n1[node-1]<<endl; //disp at end of rope
+		file_17 <<t_step<<"   "<<u_x_n1[floor(node/2)]<<"   "<<u_x_n1[node-4]<<endl; //disp at end of rope
 		
 	} //end of time integration
 	file_17.close();
+	
+	for (size_t i = 0; i < node; ++i) {
+		u_n1[i]=sqrt(pow(u_x_n1[i],2.0)+pow(u_y_n1[i],2.0)+pow(u_z_n1[i],2.0));
+		x_plus_ux[i]=x[i]+u_x_n1[i];
+		y_plus_uy[i]=y[i]+u_y_n1[i];
+		z_plus_uz[i]=z[i]+u_z_n1[i];
+	}
+	
+	ofstream file_18;
+	file_18.open ("pos_vs_disp.txt");
+	for (size_t i = 0; i < node; ++i) {
+		file_18 <<x[i]<<"   "<<u_x_n1[i]<<"   "<<u_y_n1[i]<<"   "<<u_z_n1[i]<<"   "<<u_n1[i];
+		if(i < (x_plus_ux.size()-1)) {
+			file_18 <<endl;
+		}
+		
+	}
+	file_18.close();
+	
+	//Create ouput for VTK
+	ofstream file_19;
+	file_19.open ("VTK_input.txt");
+	for (size_t i = 0; i < node; ++i) {
+		file_19 <<x_plus_ux[i]<<"   "<<y_plus_uy[i]<<"   "<<z_plus_uz[i]<<"   "<<u_n1[i];
+		if(i < (x_plus_ux.size()-1)) {
+			file_19 <<endl;
+		}
+	}
+	file_19.close();
 	
 	printf("End of program!");
 	

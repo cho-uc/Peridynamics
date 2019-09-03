@@ -55,7 +55,8 @@ int main(int argc, char **argv){
 	vector<float> b_z(node,0.0);
 	
 	vector< vector<float>> d(node, vector<float>(node,0.0)); //damage variable
-	vector< vector<size_t>> neighbor_list;
+	vector<size_t> neighbor_list(node*node/2,0); //assume length node*node/2
+	vector<size_t> neighbor_list_pointer(node,0);
 	vector<float> theta(node,0.0);	//dilation
 	vector<float> delta_V;	//nodal Volume
 	
@@ -93,26 +94,36 @@ int main(int argc, char **argv){
 	}
 	file_14.close();
 	
+	size_t iter_neighbor_list_pointer=0; 
+	size_t iter_neighbor_list=0; //length of neighbor_list
+	
 	for(size_t i = 0; i < node; ++i){
-		neighbor_list.push_back(vector<size_t>());
+		neighbor_list_pointer[i]=iter_neighbor_list_pointer;
 		for(size_t j = 0; j < node; ++j){
 			if (i!=j){
 				float distance =sqrt(pow((x[i]-x[j]),2)+pow((y[i]-y[j]),2)+pow((z[i]-z[j]),2));
 				if (distance<small_delta){
-					neighbor_list[i].push_back(j);
+					neighbor_list[iter_neighbor_list] =j;
+					iter_neighbor_list += 1;
+					iter_neighbor_list_pointer +=1;
 				}
 			}
-		}
+		}//end of j
 	}
 	
+	if(iter_neighbor_list==node*node/2){
+		cout<<"neighbor_list array length exceeds the buffer"<<endl;
+	}
 	ofstream file_15;
 	file_15.open ("neighbor_list_cpp.txt");
+	file_15 <<"node --> neighbor_list_pointer"<<endl;
 	for (size_t i = 0; i < node; ++i) {
-		file_15 <<i<< "-->";
-		for (size_t j = 0; j < neighbor_list[i].size(); ++j) {
-			file_15 <<"   "<<neighbor_list[i][j];
-		}
-		file_15 <<endl;
+		file_15 <<i<< "-->"<<neighbor_list_pointer[i]<<endl;
+	}
+	file_15 <<"============================================="<<endl;
+	file_15 <<"neighbor_list"<<endl;
+	for (size_t i = 0; i < iter_neighbor_list; ++i) {
+		file_15 <<"   "<<neighbor_list[i] <<endl;
 	}
 	file_15.close();
 	
@@ -122,8 +133,8 @@ int main(int argc, char **argv){
 	float V_dot_C_temp=0.0;
 	for (size_t i = 0; i < node; ++i) {	
 			V_dot_C_temp=0.0; //Re-initialization
-			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
-				size_t j=neighbor_list[i][k];
+			for (size_t k = neighbor_list_pointer[i]; k < neighbor_list_pointer[i+1]; ++k){
+				size_t j=neighbor_list[k];
 				float xi_x=x[j]-x[i];
 				float xi_y=y[j]-y[i];
 				float xi_z=z[j]-z[i];
@@ -143,7 +154,7 @@ int main(int argc, char **argv){
 	
 	
 	
-	const float T=(100.0*delta_t);
+	const float T=(200.0*delta_t);
 	//const float T=(2.0*delta_t);
 	const float num_steps= T/delta_t;
 		
@@ -164,8 +175,8 @@ int main(int argc, char **argv){
 
 	for (size_t i = 0; i < node; ++i) {
 			m[i]=0;
-			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
-				size_t j=neighbor_list[i][k];
+			for (size_t k = neighbor_list_pointer[i]; k < neighbor_list_pointer[i+1]; ++k){
+				size_t j=neighbor_list[k];
 				float xi_x=x[j]-x[i];
 				float xi_y=y[j]-y[i];
 				float xi_z=z[j]-z[i];
@@ -214,8 +225,8 @@ int main(int argc, char **argv){
 		//Compute the dilatation using u at (n+1)
 		for (size_t i = 0; i < node; ++i) {
 			theta[i]=0.0;
-			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
-				size_t j=neighbor_list[i][k];
+			for (size_t k = neighbor_list_pointer[i]; k < neighbor_list_pointer[i+1]; ++k){
+				size_t j=neighbor_list[k];
 				float xi_x=x[j]-x[i];
 				float xi_y=y[j]-y[i];
 				float xi_z=z[j]-z[i];
@@ -238,8 +249,8 @@ int main(int argc, char **argv){
 		
 		//Compute the pairwise contributions to the global force density vector
 		for (size_t i = 0; i < node; ++i) {
-			for (size_t k = 0; k < neighbor_list[i].size(); ++k){
-				size_t j=neighbor_list[i][k];
+			for (size_t k = neighbor_list_pointer[i]; k < neighbor_list_pointer[i+1]; ++k){
+				size_t j=neighbor_list[k];
 				
 				float xi_x=x[j]-x[i];
 				float xi_y=y[j]-y[i];
