@@ -30,4 +30,4 @@ VTK_reader
 
 
 # TODO
-Create parallel version on OpenCl
+Optimize parallel version on OpenCl and Cuda
