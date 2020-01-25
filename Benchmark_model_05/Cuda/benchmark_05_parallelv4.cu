@@ -144,8 +144,8 @@ int main(int argc, char **argv){
 	printf("minGridSize= %i, ",minGridSize_03);
 	printf("gridSize= %i \n",gridSize_03);
 	
-	dim3 gridDim_not_optimized(node/1024,1,1);         // 512 x 1 x 1
-	dim3 blockDim_not_optimized(1024, 1,1); // 1024 x 1024 x 1
+	dim3 gridDim_not_optimized(node/256,1,1);         // 512 x 1 x 1
+	dim3 blockDim_not_optimized(256, 1,1); // 1024 x 1024 x 1
 
 	
 	printf ("Use gridDim = %i, ", gridDim_not_optimized.x);
