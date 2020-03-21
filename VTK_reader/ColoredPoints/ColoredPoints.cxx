@@ -29,11 +29,14 @@
 
 using namespace std;
 
-int main(int, char *[]) {
-	
+int main(int argc, char *argv[]) {
+	if (argc < 2) {
+		printf( "Please input argument : usage = ./ColoredPoints filename.txt \n");
+		return 0;
+	}
 	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 	ifstream myfile;
-    myfile.open("pos_vs_disp.txt");
+    myfile.open(argv[1]);
     vector<float> u_n1; //to set color based on u_n1
    
     if (myfile.is_open()) {
